@@ -50,19 +50,19 @@ class Net(nn.Module):
         self.w3 = nn.Linear(50, 11)
 
     def forward(self, x):
-        x = F.relu(self.w1(x))
-        x = F.relu(self.w2(x))
+        x = F.sigmoid(self.w1(x))
+        x = F.sigmoid(self.w2(x))
         return F.sigmoid(self.w3(x))
     
 net = Net()
-cost = nn.BCEWithLogitsLoss()
-adam = optim.Adam(net.parameters(), lr=0.0001)
+cost = nn.MultiLabelSoftMarginLoss()
+adam = optim.Adam(net.parameters(), lr=0.001)
 
 to_torch = lambda x: auto.Variable(torch.from_numpy(x))
 
 amt_samples = len(train_xs)
 
-for epoch in range(1000):
+for epoch in range(10000):
     running_loss = 0.0
     for xs, ys in zip(batched_xs, batched_ys):
         adam.zero_grad()
