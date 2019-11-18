@@ -1,6 +1,7 @@
 from pandas import read_csv
 from conceptnet5.vectors.query import VectorSpaceWrapper
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 from wordfreq import simple_tokenize
 import numpy as np
 import torch
@@ -12,7 +13,7 @@ import torch.optim as optim
 # some globals
 PATH_TO_MINI = '../mini.h5'
 TRAIN_SIZE = 0.7
-EPOCHS = 1000
+EPOCHS = 10000
 
 # init wrapper and load data
 df = read_csv('all.csv')
@@ -25,14 +26,16 @@ train, test = train_test_split(df, train_size=TRAIN_SIZE, test_size=None)
 
 mean = lambda l: sum(l) / len(l)
 
+
 def desc2vec(desc):
     tokenized = simple_tokenize(desc)
     vecs = list(map(lambda s: wrapper.text_to_vector('en', s), tokenized))
     return mean(vecs)
 
-train_xs = train['desc'].map(desc2vec)
+
+train_xs = np.array(train['desc'].map(desc2vec))
 train_ys = np.array(train[labels])
-test_xs = test['desc'].map(desc2vec)
+test_xs = np.array(test['desc'].map(desc2vec))
 test_ys = np.array(test[labels])
 
 # batch training data
@@ -45,6 +48,7 @@ for i in range(0, len(train_xs), 50):
     batched_ys.append(np.stack(y))
 amt_batches = len(batched_xs)
 
+
 # define neural network structure and forward pass
 class Net(nn.Module):
 
@@ -52,18 +56,21 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.w1 = nn.Linear(300, 50)
         self.w2 = nn.Linear(50, 50)
-        self.w3 = nn.Linear(50, 11)
+        self.w3 = nn.Linear(50, 10)
+        self.w4 = nn.Linear(10, 2)
 
     def forward(self, x):
         x = F.relu(self.w1(x))
         x = F.relu(self.w2(x))
-        return F.log_softmax(self.w3(x))
+        x = F.relu(self.w3(x))
+        return F.log_softmax(self.w4(x))
+
 
 # define one model for each label -- perhaps this might work nicely
 classifiers = [Net() for label in labels]
 
 # optimizer and loss
-adams = [optim.Adam(clf.parameters(), lr=0.001) for clf in classifiers]
+adams = [optim.Adam(clf.parameters(), lr=0.01) for clf in classifiers]
 cost = nn.CrossEntropyLoss()
 
 # train each classifier now
@@ -87,8 +94,13 @@ for i, clf in enumerate(classifiers):
             final_loss = total_loss / amt_batches
     print(f'Loss for {labels[i]}: {final_loss}')
 
+
+def make_prediction(x, clfs):
+    return np.array([int(clf(to_torch(x)).argmax()) for clf in clfs])
+
+
 # validation step
-
-
-
-
+test_preds = np.stack(list(map(lambda x: make_prediction(x, classifiers),
+                               test_xs)))
+acc = accuracy_score(test_preds, test_ys)
+print(f'Test accuracy: {acc * 100}%')
