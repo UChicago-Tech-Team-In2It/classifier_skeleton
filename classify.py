@@ -16,11 +16,12 @@ import torch.optim as optim
 STOP_WORDS = set(stopwords.words('english'))
 PATH_TO_MINI = '../mini.h5'
 TRAIN_SIZE = 0.7
-EPOCHS = 4000
+EPOCHS = 10000
 
 # init wrapper and load data
-df = read_csv('all.csv')
-labels = list(df.columns)[4:]
+df = read_csv('volunteermatch_data.csv').dropna()
+print(df.head())
+labels = list(df.columns)[5:]
 
 df[labels] = df[labels] * 1
 wrapper = VectorSpaceWrapper(PATH_TO_MINI)
